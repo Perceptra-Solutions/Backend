@@ -54,7 +54,7 @@ describe('Invariantes do schema', () => {
 
   beforeEach(async () => {
     await db.query(`TRUNCATE evidencia, verificacao, acao_corretiva, nao_conformidade,
-      deteccao, camera, local, requisito_norma, modelo_ia, obra, usuario,
+      deteccao, credencial_dispositivo, camera, local, requisito_norma, modelo_ia, obra, usuario,
       relatorio_item, relatorio RESTART IDENTITY CASCADE`);
 
     engenheiroA = (
@@ -171,6 +171,58 @@ describe('Invariantes do schema', () => {
         [obra],
       );
       expect(id).toBeTruthy();
+    });
+  });
+
+  describe('credencial de dispositivo', () => {
+    it('exige hash SHA-256 em hex minusculo (64 chars)', async () => {
+      expect(
+        await codigoDoErro(
+          `INSERT INTO credencial_dispositivo (camera_id,prefixo,hash_secreto)
+           VALUES ($1,'abc123','nao-e-um-hash-sha256')`,
+          [camera],
+        ),
+      ).toBe('23514');
+
+      expect(
+        await codigoDoErro(
+          // maiusculo tambem nao vale — o CHECK e [0-9a-f], nao case-insensitive.
+          `INSERT INTO credencial_dispositivo (camera_id,prefixo,hash_secreto)
+           VALUES ($1,'abc124',$2)`,
+          [camera, HASH_VALIDO.toUpperCase()],
+        ),
+      ).toBe('23514');
+    });
+
+    it('aceita hash valido e escopos default vazio', async () => {
+      const { id, escopos } = await um<{ id: string; escopos: string[] }>(
+        `INSERT INTO credencial_dispositivo (camera_id,prefixo,hash_secreto)
+         VALUES ($1,'abc125',$2) RETURNING id, escopos`,
+        [camera, HASH_VALIDO],
+      );
+      expect(id).toBeTruthy();
+      expect(escopos).toEqual([]);
+    });
+
+    it('nao deixa duas credenciais dividirem o mesmo prefixo', async () => {
+      await db.query(
+        `INSERT INTO credencial_dispositivo (camera_id,prefixo,hash_secreto) VALUES ($1,'dup-1',$2)`,
+        [camera, HASH_VALIDO],
+      );
+      expect(
+        await codigoDoErro(
+          `INSERT INTO credencial_dispositivo (camera_id,prefixo,hash_secreto) VALUES ($1,'dup-1',$2)`,
+          [camera, HASH_VALIDO],
+        ),
+      ).toBe('23505');
+    });
+
+    it('impede apagar camera com credencial emitida (RESTRICT, nao apaga o rastro de proveniencia)', async () => {
+      await db.query(
+        `INSERT INTO credencial_dispositivo (camera_id,prefixo,hash_secreto) VALUES ($1,'rest-1',$2)`,
+        [camera, HASH_VALIDO],
+      );
+      expect(await codigoDoErro(`DELETE FROM camera WHERE id=$1`, [camera])).toBe('23001');
     });
   });
 

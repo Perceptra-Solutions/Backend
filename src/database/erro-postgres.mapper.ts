@@ -55,8 +55,40 @@ const MENSAGEM_POR_CONSTRAINT: Record<string, { codigo: string; mensagem: string
     codigo: 'ACAO_JA_APROVADA',
     mensagem: 'Esta acao corretiva ja tem uma verificacao aprovada.',
   },
+  ux_credencial_prefixo: {
+    codigo: 'PREFIXO_CREDENCIAL_DUPLICADO',
+    mensagem: 'Colisao ao gerar o prefixo da credencial — tente emitir novamente.',
+  },
+  ux_obra_codigo: {
+    codigo: 'CODIGO_OBRA_DUPLICADO',
+    mensagem: 'Ja existe uma obra com esse codigo.',
+  },
+  ux_local_obra_codigo: {
+    codigo: 'CODIGO_LOCAL_DUPLICADO',
+    mensagem: 'Ja existe um local com esse codigo nesta obra.',
+  },
+  ux_modelo_nome_versao: {
+    codigo: 'MODELO_VERSAO_DUPLICADA',
+    mensagem: 'Ja existe um modelo de IA com esse nome e versao.',
+  },
+  ux_camera_obra_identificador: {
+    codigo: 'IDENTIFICADOR_CAMERA_DUPLICADO',
+    mensagem: 'Ja existe uma camera com esse identificador nesta obra.',
+  },
+  ux_requisito_norma_item: {
+    codigo: 'REQUISITO_NORMA_DUPLICADO',
+    mensagem: 'Ja existe um requisito de norma com essa norma e item.',
+  },
 
   // --- CHECK ---
+  ck_obra_datas: {
+    codigo: 'DATAS_OBRA_INVALIDAS',
+    mensagem: 'A data de fim previsto nao pode ser anterior a data de inicio previsto.',
+  },
+  ck_obra_uf: {
+    codigo: 'UF_INVALIDA',
+    mensagem: 'A UF precisa ser a sigla de duas letras maiusculas do estado.',
+  },
   ck_usuario_crea: {
     codigo: 'CREA_SO_PARA_ENGENHEIRO',
     mensagem: 'O campo CREA so pode ser preenchido para usuarios com papel ENGENHEIRO.',
@@ -104,6 +136,10 @@ const MENSAGEM_POR_CONSTRAINT: Record<string, { codigo: string; mensagem: string
   ck_evidencia_hash: {
     codigo: 'HASH_INVALIDO',
     mensagem: 'O hash da evidencia precisa ser SHA-256 em 64 caracteres hexadecimais minusculos.',
+  },
+  ck_credencial_hash: {
+    codigo: 'HASH_CREDENCIAL_INVALIDO',
+    mensagem: 'O hash da credencial de dispositivo precisa ser SHA-256 em 64 hex minusculos.',
   },
   ck_camera_stream_cifrado: {
     codigo: 'STREAM_NAO_CIFRADO',

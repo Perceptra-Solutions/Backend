@@ -148,6 +148,31 @@ export class VariaveisDeAmbiente {
   @MinLength(16)
   DEVICE_API_KEY_PEPPER!: string;
 
+  // --- monitoramento (AWS: S3 + SQS do pipeline EPI/fissura) ---
+  @IsOptional()
+  @IsString()
+  MONITORAMENTO_AWS_REGION?: string;
+
+  @IsOptional()
+  @IsString()
+  MONITORAMENTO_AWS_BUCKET?: string;
+
+  @IsOptional()
+  @IsString()
+  MONITORAMENTO_AWS_QUEUE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MONITORAMENTO_AWS_ACCESS_KEY_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  MONITORAMENTO_AWS_SECRET_ACCESS_KEY?: string;
+
+  @IsOptional()
+  @IsInt()
+  MONITORAMENTO_URL_TTL_SEGUNDOS?: number;
+
   // --- operacional ---
   @IsOptional()
   @IsString()

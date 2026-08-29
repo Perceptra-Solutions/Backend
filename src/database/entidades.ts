@@ -1,4 +1,5 @@
 import { Camera } from '../catalogo-ia/camera.entity.js';
+import { CredencialDispositivo } from '../catalogo-ia/credencial-dispositivo.entity.js';
 import { Deteccao } from '../ingestao/deteccao.entity.js';
 import { Evidencia } from '../evidencias/evidencia.entity.js';
 import { Local } from '../obras/local.entity.js';
@@ -27,6 +28,7 @@ export const ENTIDADES = [
   Local,
   ModeloIa,
   Camera,
+  CredencialDispositivo,
   RequisitoNorma,
   Deteccao,
   NaoConformidade,
