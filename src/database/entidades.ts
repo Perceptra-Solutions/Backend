@@ -4,6 +4,7 @@ import { Evidencia } from '../evidencias/evidencia.entity.js';
 import { Local } from '../obras/local.entity.js';
 import { ModeloIa } from '../catalogo-ia/modelo-ia.entity.js';
 import { NaoConformidade } from '../qualidade/nao-conformidade.entity.js';
+import { NaoConformidadeEvento } from '../qualidade/nao-conformidade-evento.entity.js';
 import { AcaoCorretiva } from '../qualidade/acao-corretiva.entity.js';
 import { Obra } from '../obras/obra.entity.js';
 import { Relatorio } from '../relatorios/relatorio.entity.js';
@@ -29,6 +30,7 @@ export const ENTIDADES = [
   RequisitoNorma,
   Deteccao,
   NaoConformidade,
+  NaoConformidadeEvento,
   AcaoCorretiva,
   Verificacao,
   Evidencia,

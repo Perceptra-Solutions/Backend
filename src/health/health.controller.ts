@@ -4,12 +4,18 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 
+import { Publico } from '../auth/decorators/publico.decorator.js';
+
 /**
  * Health check escrito a mao, de proposito: @nestjs/terminus@11 declara
  * peer `@nestjs/common: ^10 || ^11` e da ERESOLVE contra o Nest 12 deste
  * projeto. Nao existe versao compativel — e 30 linhas resolvem.
  */
 @ApiTags('health')
+// Publico de proposito: o JwtAuthGuard e global, e um health check que exige
+// token nao serve para monitoramento — o HEALTHCHECK do container tambem
+// deixaria de passar.
+@Publico()
 @Controller('/health')
 export class HealthController {
   constructor(
