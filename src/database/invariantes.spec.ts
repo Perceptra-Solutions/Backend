@@ -708,4 +708,57 @@ describe('Invariantes do schema', () => {
       expect(await codigoDoErro(`DELETE FROM nao_conformidade WHERE id=$1`, [nc.id])).toBe('23001');
     });
   });
+
+  /**
+   * Planta da obra (migration 1756400004000). Diferente da evidencia, a
+   * planta e cadastro e pode ser substituida — mas os campos tem que andar
+   * juntos, senao o download aponta para arquivo sem hash para conferir.
+   */
+  describe('planta da obra', () => {
+    const URI = 'plantas/aa/bb/' + 'a'.repeat(64) + '.png';
+
+    it('aceita obra sem planta nenhuma', async () => {
+      expect(await codigoDoErro(`UPDATE obra SET planta_uri=NULL WHERE id=$1`, [obra])).toBe('NENHUM_ERRO');
+    });
+
+    it('aceita a planta completa', async () => {
+      expect(
+        await codigoDoErro(
+          `UPDATE obra SET planta_uri=$1, planta_mime='image/png', planta_hash_sha256=$2,
+             planta_tamanho_bytes=1024, planta_atualizada_em=now() WHERE id=$3`,
+          [URI, HASH_VALIDO, obra],
+        ),
+      ).toBe('NENHUM_ERRO');
+    });
+
+    it('recusa planta pela metade (uri sem hash)', async () => {
+      expect(
+        await codigoDoErro(
+          `UPDATE obra SET planta_uri=$1, planta_mime='image/png', planta_hash_sha256=NULL,
+             planta_atualizada_em=now() WHERE id=$2`,
+          [URI, obra],
+        ),
+      ).toBe('23514');
+    });
+
+    it('recusa hash fora do formato sha-256', async () => {
+      expect(
+        await codigoDoErro(
+          `UPDATE obra SET planta_uri=$1, planta_mime='image/png', planta_hash_sha256=$2,
+             planta_atualizada_em=now() WHERE id=$3`,
+          [URI, 'Z' + 'a'.repeat(63), obra],
+        ),
+      ).toBe('23514');
+    });
+
+    it('recusa tamanho zero ou negativo', async () => {
+      expect(
+        await codigoDoErro(
+          `UPDATE obra SET planta_uri=$1, planta_mime='image/png', planta_hash_sha256=$2,
+             planta_tamanho_bytes=0, planta_atualizada_em=now() WHERE id=$3`,
+          [URI, HASH_VALIDO, obra],
+        ),
+      ).toBe('23514');
+    });
+  });
 });

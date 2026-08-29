@@ -45,4 +45,33 @@ export class Obra {
 
   @CreateDateColumn({ type: 'timestamptz', name: 'criado_em' })
   criadoEm!: Date;
+
+  /**
+   * Planta / mapa do canteiro (migration `1756400004000-PlantaDaObra`).
+   *
+   * Mesmo padrão da evidência: o binário vive no storage
+   * (`ArmazenamentoPort`) e aqui ficam só a chave e o metadado. Diferente da
+   * evidência, é cadastro e não prova — pode ser substituída, e o CHECK
+   * `ck_obra_planta_completa` garante que os campos andem sempre juntos.
+   *
+   * `select: false` na URI: é caminho interno do bucket e nunca deve sair
+   * numa resposta de API por descuido — o download tem rota própria.
+   */
+  @Column({ type: 'text', name: 'planta_uri', nullable: true, select: false })
+  plantaUri!: string | null;
+
+  @Column({ type: 'text', name: 'planta_nome', nullable: true })
+  plantaNome!: string | null;
+
+  @Column({ type: 'text', name: 'planta_mime', nullable: true })
+  plantaMime!: string | null;
+
+  @Column({ type: 'char', length: 64, name: 'planta_hash_sha256', nullable: true })
+  plantaHashSha256!: string | null;
+
+  @Column({ type: 'bigint', name: 'planta_tamanho_bytes', nullable: true })
+  plantaTamanhoBytes!: string | null;
+
+  @Column({ type: 'timestamptz', name: 'planta_atualizada_em', nullable: true })
+  plantaAtualizadaEm!: Date | null;
 }

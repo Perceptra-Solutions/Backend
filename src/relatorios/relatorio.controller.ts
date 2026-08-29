@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { enviarStream } from '../shared/util/enviar-stream.js';
 
 import { Papeis } from '../auth/decorators/papeis.decorator.js';
 import { UsuarioAtual } from '../auth/decorators/usuario-atual.decorator.js';
@@ -56,8 +57,7 @@ export class RelatorioController {
   })
   async arquivo(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
     const { stream, mime, nome } = await this.relatorios.abrirArquivo(id);
-    res.set({ 'Content-Type': mime, 'Content-Disposition': `inline; filename="${nome}"` });
-    stream.pipe(res);
+    enviarStream(res, stream, { mime, nome });
   }
 
   @Get(':id/integridade')
