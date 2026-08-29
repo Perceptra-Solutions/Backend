@@ -8,7 +8,6 @@ import { ConfigService } from '@nestjs/config';
 
 import { RecursoNaoEncontradoError } from '../shared/erros/recurso-nao-encontrado.error.js';
 import { ArmazenamentoPort } from './armazenamento.port.js';
-import { RecursoNaoEncontradoError } from '../shared/erros/recurso-nao-encontrado.error.js';
 
 /**
  * Fallback em disco, para rodar a demo sem nuvem (`EVIDENCIA_STORAGE_DRIVER=local`).
@@ -31,38 +30,26 @@ export class ArmazenamentoLocal extends ArmazenamentoPort {
   }
 
   /**
-<<<<<<< HEAD
    * Confere a existencia ANTES de abrir o stream. `createReadStream` falha de
    * forma assincrona, emitindo 'error' — e um ReadStream sem handler de
    * 'error' derruba o processo Node inteiro (unhandled 'error' event), nao so
-   * a requisicao. Isso acontecia de verdade: o seed cadastra linhas de
-   * evidencia com hash sintetico e sem binario no disco, entao bastava a UI
-   * pedir o arquivo de uma delas para a API morrer.
+   * a requisicao.
+   *
+   * Encontrado de forma independente duas vezes: aqui, com o seed cadastrando
+   * linha de evidencia com hash sintetico e sem binario no disco; e num teste
+   * contra container, com uma evidencia apontando para arquivo fora do
+   * volume — reiniciou a API duas vezes antes de virar este fix.
    *
    * Falhando aqui, o erro vira 404 pelo filtro global, como qualquer outro
-   * recurso ausente. O handler de 'error' no controller cobre o resto (o
-   * arquivo pode sumir entre esta checagem e a leitura).
-=======
-   * Confere a existencia ANTES de devolver o stream.
-   *
-   * Sem isto, `createReadStream` de um caminho inexistente devolve um stream
-   * que so falha depois — e como o controller ja fez `.pipe(res)`, o
-   * 'error' sai sem ouvinte e o Node DERRUBA O PROCESSO
-   * (`Unhandled 'error' event`). Aconteceu de verdade: uma linha de evidencia
-   * apontando para arquivo que nao estava no volume do container reiniciou a
-   * API duas vezes. Agora vira 404, que e a resposta correta.
->>>>>>> 9834c513aac846ae96f10de23fed41ddcb87d5fd
+   * recurso ausente. O handler em `enviarStream` (usado pelo controller)
+   * cobre o resto — o arquivo pode sumir entre esta checagem e a leitura.
    */
   async abrirLeitura(chave: string): Promise<Readable> {
     const caminho = join(this.raiz, chave);
     try {
       await access(caminho);
     } catch {
-<<<<<<< HEAD
       throw new RecursoNaoEncontradoError('Arquivo de evidencia', chave);
-=======
-      throw new RecursoNaoEncontradoError('Arquivo no storage', chave);
->>>>>>> 9834c513aac846ae96f10de23fed41ddcb87d5fd
     }
     return createReadStream(caminho);
   }

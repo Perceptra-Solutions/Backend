@@ -55,21 +55,7 @@ export class EvidenciaController {
   })
   async arquivo(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
     const { stream, mime, nome } = await this.evidencias.abrirArquivo(id);
-<<<<<<< HEAD
-    res.set({
-      'Content-Type': mime,
-      'Content-Disposition': `inline; filename="${nome}"`,
-    });
-
-    // Sem este handler, um erro no meio da leitura (arquivo removido depois
-    // da checagem de existencia, disco com problema) emite 'error' sem
-    // ouvinte e o Node derruba o PROCESSO INTEIRO, nao so esta requisicao.
-    // Aqui os headers ja podem ter ido embora, entao so da para abortar.
-    stream.on('error', () => res.destroy());
-    stream.pipe(res);
-=======
     enviarStream(res, stream, { mime, nome });
->>>>>>> 9834c513aac846ae96f10de23fed41ddcb87d5fd
   }
 
   @Get(':id/integridade')
