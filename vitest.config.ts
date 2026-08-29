@@ -1,13 +1,13 @@
 import { defineConfig } from 'vitest/config';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
+// Sem vite-tsconfig-paths: o tsconfig.json deste projeto nao define "paths",
+// e o proprio vitest avisa que o plugin e redundante.
+// NAO adicione plugin esbuild/swc aqui: o pipeline Oxc do vitest emite
+// decorator metadata corretamente, e o esbuild NAO — trocar quebra toda a DI.
 export default defineConfig({
-  // Resolves the path aliases declared in tsconfig.json, including the ones
-  // added by `nest g library`.
-  plugins: [tsconfigPaths()],
   test: {
     globals: true,
     root: './',
-    include: ['**/*.spec.ts'],
+    include: ['src/**/*.spec.ts'],
   },
 });

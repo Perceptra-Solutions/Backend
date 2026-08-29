@@ -1,114 +1,135 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Perceptra — Backend de Qualidade em Obra
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend do Desafio 1 do Hackathon Construtech 2026 (PBQP-H / NBR 15575).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Fecha o ciclo: **câmera detecta → engenheiro tria → nasce a Não Conformidade → ação corretiva → verificação por outro engenheiro → painel de conformidade**, com evidência hasheada e norma no meio.
 
-## Description
+NestJS 12 · TypeScript 6 · ESM puro · TypeORM 1 · PostgreSQL 18
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Subir tudo
+
+Requer apenas Docker.
 
 ```bash
-$ npm install
+docker compose up -d --build
 ```
 
-## Compile and run the project
+Isso sobe o Postgres, espera ficar saudável, roda as migrations num container efêmero e só então sobe a API.
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker compose --profile seed run --rm seed
 ```
 
-## Run tests
+Popula os dados da demo. A API fica em <http://localhost:3000> e o Swagger em <http://localhost:3000/docs>.
+
+| Comando | O que faz |
+|---|---|
+| `npm run docker:up` | build + sobe tudo |
+| `npm run docker:seed` | popula os dados da demo |
+| `npm run docker:logs` | acompanha o log da API |
+| `npm run docker:down` | derruba (mantém o volume do banco) |
+| `npm run docker:reset` | derruba **apagando o volume** e sobe do zero |
+
+Usuários do seed (senha única `perceptra123`):
+
+| E-mail | Papel |
+|---|---|
+| `gestora@perceptra.dev` | GESTOR |
+| `ana@perceptra.dev` | ENGENHEIRO — executou a ação da NC resolvida |
+| `bruno@perceptra.dev` | ENGENHEIRO — verificou a ação da Ana |
+
+Ana e Bruno são pessoas diferentes de propósito: é essa separação que a demonstração da segregação de função usa.
+
+---
+
+## Desenvolvimento fora do container
+
+O `.env` já aponta para o Postgres do container em `localhost:5432`, então dá para rodar a API na máquina com hot-reload e o banco no Docker:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d postgres
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Observability
+## Testes
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+```bash
+npm test
+```
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+53 testes, **sem precisar de banco nenhum**: as invariantes do schema rodam contra as migrations reais num PostgreSQL 18 em processo (PGlite). Funciona em qualquer máquina e no CI.
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+```bash
+npm run test:e2e
+```
 
-## Resources
+Sobe a aplicação inteira contra o Postgres do container. Usa o banco `qualidade_obra_test`, nunca o de desenvolvimento — a suíte trunca tabelas. Crie-o uma vez:
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+docker compose exec postgres psql -U perceptra -d postgres -c "CREATE DATABASE qualidade_obra_test OWNER perceptra;"
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+docker compose run --rm -e DATABASE_URL="postgresql://perceptra:perceptra@postgres:5432/qualidade_obra_test" migracao
+```
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Regras do projeto
 
-## Stay in touch
+Três coisas que, se ignoradas, destroem trabalho silenciosamente:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. **Nunca `synchronize: true` no TypeORM.** Ele apaga CHECK, trigger e índice parcial sem avisar — e é neles que moram as invariantes do MER (segregação de função, imutabilidade da evidência, prazo por severidade).
+2. **Nunca adicione plugin esbuild/swc ao Vitest.** O pipeline atual (Oxc) emite `emitDecoratorMetadata` corretamente; o esbuild não. Trocar quebra toda a injeção de dependência de uma vez, em todos os testes.
+3. **Nunca use glob de entities** (`entities: ['dist/**/*.entity.js']`). Sob ESM no Windows o caminho vira `D:\...` e o loader do Node rejeita, lendo `D:` como protocolo. Use `autoLoadEntities: true` e a lista explícita em `src/database/entidades.ts`.
 
-## License
+Outras convenções que o código assume:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Todo import relativo termina em `.js`, mesmo apontando para um `.ts` (exigência do `moduleResolution: nodenext`). Arquivos gerados por `nest g` vêm sem — rode `npm run typecheck` depois.
+- **Sem barrel files** (`index.ts`) em `src/`. Sob ESM um barril transforma ciclo de tipo, inofensivo, em ciclo de runtime com TDZ.
+- Portas de injeção (`ArmazenamentoPort`) são `abstract class`, nunca `interface`: interface some no emit e o Nest não resolve o provider.
+- Nenhum arquivo de `src/` lê `process.env` direto, exceto os factories de `registerAs` e o `data-source.ts` (que roda fora do Nest).
+
+---
+
+## Migrations
+
+Rodam contra o **build**, não contra `.ts` — o `typeorm-ts-node-esm` depende de um ts-node que não conhece TypeScript 6 nem os loader hooks do Node 24.
+
+```bash
+npm run db:migrate
+```
+
+As migrations são escritas à mão. `migration:generate` não produz CHECK, trigger, índice parcial nem FK com política de delete — que é justamente o que carrega as regras de negócio aqui.
+
+---
+
+## Estrutura
+
+```
+src/
+├─ config/          validação de env no boot (falha subindo, não na 1ª request)
+├─ database/        DataSource, migrations, seed, mapeador de erro do Postgres
+├─ shared/          contrato de erro, pipes, interceptors, middlewares
+├─ armazenamento/   porta de storage (S3/R2 e disco local)
+├─ auth/            JWT + guards de papel
+├─ identidade/      usuario
+├─ obras/           obra + local
+├─ catalogo-ia/     modelo_ia + camera
+├─ ingestao/        deteccao (lote) + triagem
+├─ normas/          requisito_norma
+├─ qualidade/       NÚCLEO — NC, ação corretiva, verificação, domínio puro
+├─ evidencias/      upload, SHA-256 em streaming, cadeia de custódia
+├─ relatorios/      relatório PBQP-H
+├─ painel/          indicadores (read model)
+└─ health/          liveness e readiness
+```
+
+O domínio em `src/qualidade/dominio/` é puro: sem Nest, sem TypeORM, sem I/O. A máquina de estados da NC e a segregação de função são funções testáveis em milissegundos.

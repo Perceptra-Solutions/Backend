@@ -1,0 +1,27 @@
+# Contexto de build enxuto: quanto menor, mais rapido o build e menor o
+# risco de vazar segredo para dentro da imagem.
+node_modules
+dist
+coverage
+.git
+.gitignore
+
+# NUNCA copie o .env para a imagem: a config vem do compose/ambiente.
+.env
+.env.*
+!.env.example
+
+storage
+*.tsbuildinfo
+*.log
+.vscode
+.idea
+test
+**/*.spec.ts
+**/*.e2e-spec.ts
+vitest.config.ts
+vitest.config.e2e.ts
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
