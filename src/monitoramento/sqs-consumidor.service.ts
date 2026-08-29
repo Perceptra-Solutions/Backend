@@ -34,6 +34,31 @@ export function ehFalhaPermanente(erro: unknown): boolean {
 }
 
 /**
+ * Credencial errada ou sem permissao na fila. Diferente de falha de rede:
+ * tentar de novo NUNCA resolve, e o loop de 5s vira um ERROR por segundo no
+ * log ate alguem perceber.
+ *
+ * Aconteceu de verdade: a chave do usuario `epi-inferencia-local` foi posta
+ * no `.env` do backend, mas a policy dele nao cobre `sqs:ReceiveMessage` em
+ * `fila-resultados-web` (essa e do `web-backend-epis`) — ver ARQUITETURA_AWS.md,
+ * "Por que usuarios IAM separados em vez de uma chave so".
+ */
+export function ehFalhaDeCredencial(erro: unknown): boolean {
+  if (typeof erro !== 'object' || erro === null) return false;
+  const alvo = erro as { name?: string; $metadata?: { httpStatusCode?: number } };
+  const nomes = [
+    'AccessDenied',
+    'AccessDeniedException',
+    'InvalidClientTokenId',
+    'UnrecognizedClientException',
+    'SignatureDoesNotMatch',
+    'AuthorizationError',
+    'QueueDoesNotExist',
+  ];
+  return nomes.includes(alvo.name ?? '') || alvo.$metadata?.httpStatusCode === 403;
+}
+
+/**
  * Consome `fila-resultados-web` (ver ARQUITETURA_AWS.md): a fila recebe uma
  * mensagem toda vez que o serviço de inferência (fora deste backend, roda
  * numa máquina local do time) termina de processar uma imagem e grava
@@ -94,6 +119,21 @@ export class SqsConsumidorService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.receberUmaLeva();
       } catch (erro) {
+        // Credencial sem permissao na fila: para o loop em vez de repetir o
+        // mesmo ERROR a cada 5s para sempre. O resto da API segue normal —
+        // so o feed ao vivo fica desligado, com a instrucao no log.
+        if (ehFalhaDeCredencial(erro)) {
+          this.rodando = false;
+          this.logger.error(
+            'Credencial sem permissao na fila de resultados — consumidor DESLIGADO (nao adianta repetir). ' +
+              'A chave em MONITORAMENTO_AWS_* precisa de sqs:ReceiveMessage e sqs:DeleteMessage em ' +
+              '"fila-resultados-web" e s3:GetObject em "processed/*" — e o usuario "web-backend-epis" ' +
+              '(ver ARQUITETURA_AWS.md). O resto da API continua funcionando.\n  ' +
+              (erro instanceof Error ? erro.message : String(erro)),
+          );
+          return;
+        }
+
         this.logger.error(
           'Falha ao consumir a fila de resultados de monitoramento.',
           erro instanceof Error ? erro.stack : String(erro),

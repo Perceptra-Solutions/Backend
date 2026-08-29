@@ -2,7 +2,7 @@
 
 Documento de passagem. O [README.md](README.md) explica como rodar; este explica **o que existe, por quê está assim, e o que fazer a seguir**.
 
-Última atualização: 29/08/2026 · Fases 1–7 concluídas · 149 testes unitários + 132 e2e passando.
+Última atualização: 29/08/2026 · Fases 1–7 concluídas · 155 testes unitários + 146 e2e passando.
 
 ---
 
@@ -18,14 +18,14 @@ Documento de passagem. O [README.md](README.md) explica como rodar; este explica
 | 6 | CRUD de cadastros, rate limit, acabamento | ✅ |
 | 7 | Relatório PBQP-H: geração, snapshot, hash, integridade | ✅ |
 
-**63 endpoints no ar.** Testes: **149 unitários** (sem banco, PGlite em
-processo) + **132 e2e** contra Postgres real.
+**63 endpoints no ar.** Testes: **155 unitários** (sem banco, PGlite em
+processo) + **146 e2e** contra Postgres real.
 
 > **Fases 4–7 validadas contra Postgres real em 29/08/2026.** O aviso que
 > ficava aqui — "Fases 4-6 nunca rodaram contra banco de verdade" — está
 > resolvido. O que foi feito: `docker compose up -d`, migrations aplicadas nos
 > dois bancos (dev e teste estavam parados na 3ª de 4), `npm run test:e2e`
-> (132/132) e exercício manual de cada rota nova via HTTP, incluindo upload de
+> (146/146) e exercício manual de cada rota nova via HTTP, incluindo upload de
 > evidência com conferência de hash e ingestão de dispositivo com credencial
 > real. **Uma falha real apareceu nessa validação** — ver "A dedup que contava
 > errado" na seção 4.
@@ -386,7 +386,7 @@ Se você precisar de `forwardRef()`, a regra 2 foi violada. Mova a regra, não u
 npm run typecheck && npm run lint && npm test
 ```
 
-`npm test` não precisa de banco (149 casos). Para o e2e (132 casos), o Postgres
+`npm test` não precisa de banco (155 casos). Para o e2e (146 casos), o Postgres
 do container precisa estar de pé e o banco de teste migrado:
 
 ```bash
@@ -465,9 +465,49 @@ recente em destaque (a "câmera ao vivo" é a imagem trocando a cada novo
 evento, não vídeo contínuo — ~1 a cada 2-3s), um histórico curto abaixo, e
 dispara toast quando `alertas` vem preenchido.
 
-**Não verificado**: não há credencial AWS real neste ambiente (as duas
-variáveis `MONITORAMENTO_AWS_ACCESS_KEY_ID`/`SECRET_ACCESS_KEY` ficaram vazias
-de propósito — nunca cole segredo em texto no repo). Confirmado até onde dá
+### Verificação contra a AWS real — 29/08/2026
+
+Com a credencial do usuário `epi-inferencia-local` em mãos, deu para checar o
+que antes era só leitura de código:
+
+**O pipeline rodou de verdade.** 499 resultados em `processed/`, de 06:48 a
+09:33 do mesmo dia. `raw/` vazio (o `inference_service` apaga depois de
+processar, como projetado).
+
+**O contrato bate com dado real**, não só com o código. Amostrando 120 dos
+499 `.json`: campos de topo exatamente `imagem_original`, `deteccoes_epi`,
+`deteccoes_fissura`, `alertas`; cada detecção com `classe_id`, `classe`,
+`confianca`, `caixa`. É o que `SqsConsumidorService.buscarResultado` parseia.
+Classes observadas: `Veículo` (111×), `Sem Colete` (3×), `Pessoa` (1×) — e o
+`CLASSE_PARA_CODIGO` trata as três certo (só `Sem Colete` vira `Deteccao`;
+`Veículo` e `Pessoa` são contexto). Alertas observados: `EPI` e
+`PRESENCA_FORA_DE_TURNO`.
+
+**Configuração alinhada** nos quatro pontos (firmware, inferência, backend,
+doc): bucket `perceptra-epis-1`, região `sa-east-1`, conta `609330996177`,
+filas e prefixos idênticos. As duas cópias do cliente de câmera
+(`hardware_client/` aqui e `firmware/` no repo `Perceptra-One`) produzem a
+mesma chave `raw/{DEVICE_ID}_{ms}.jpg` — divergem só no periférico (OpenCV +
+webcam USB a 1 fps × picamera2 a 0,5 fps).
+
+**Dois defeitos encontrados e corrigidos aqui:**
+
+1. O `docker-compose.yml` **não repassava** `MONITORAMENTO_AWS_*` para o
+   container da API. Com o `.env` preenchido, o consumidor continuaria
+   desligado sem explicação. Bloco adicionado ao serviço `api`.
+2. Falha de credencial fazia o loop repetir o mesmo `ERROR` a cada 5s para
+   sempre. Agora `ehFalhaDeCredencial()` desliga o consumidor na primeira
+   ocorrência, com a instrução de qual permissão falta. O resto da API segue.
+
+**O que ainda falta para o feed ao vivo funcionar:** a chave gravada no
+`.env` é do `epi-inferencia-local`, e a policy dele **não cobre**
+`sqs:ReceiveMessage` em `fila-resultados-web` (a própria AWS responde isso).
+Ele tem `s3:GetObject` em `processed/*`, que é a outra metade. Ou use a chave
+do `web-backend-epis`, ou acrescente `sqs:ReceiveMessage` + `sqs:DeleteMessage`
+naquela fila à policy deste usuário.
+
+**Sobre a credencial**: o `.env` é gitignorado e é onde ela vive. Nunca
+commite chave da AWS. Confirmado até onde dá
 sem nuvem: typecheck, lint, os 149 testes, e o boot com Postgres real, onde
 o `onModuleInit` do `SqsConsumidorService` **agora chega a rodar** e loga
 `MONITORAMENTO_AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY ausentes — feed ao vivo
@@ -475,9 +515,46 @@ desligado`, com a API subindo normal. (No smoke-test antigo isso nunca
 aparecia, porque o boot travava antes na conexão com o banco.) Preencha as
 credenciais de `web-backend-epis` para validar de ponta a ponta.
 
-**Divergência a conferir quando a credencial entrar**: `CLASSE_PARA_CODIGO`
-em `persistencia-deteccao.service.ts` mapeia `SEM_COLETE` e `SEM_MASCARA`,
-mas o catálogo do `epi-detector` no seed é `['SEM_CAPACETE','SEM_CINTO',
-'SEM_LUVA']`. A coluna `classe` é texto livre (sem CHECK), então nada
-quebra no banco — mas o front pode não ter rótulo para esses dois códigos.
-Alinhe o seed com as classes reais do pipeline Python, ou o mapa com o seed.
+**O contrato com o pipeline Python está verificado** —
+`test/monitoramento-pipeline.e2e-spec.ts` (14 casos) alimenta o
+`PersistenciaDeteccaoService` com o JSON no formato REAL do
+`inference_service` (nomes de classe de `config.py::EPI_CLASSES_PT`, forma
+da detecção de `models.py::_para_deteccoes`, alertas de `rules.py`) contra
+Postgres real. Só o download da imagem do S3 é simulado; hash, storage,
+transação, FKs, triggers e a deduplicação são de verdade. Cobre: câmera
+`RPI-01` provisionada sozinha, classes de conformidade descartadas,
+`caixa [x1,y1,x2,y2]` → `bbox {x,y,w,h}`, `obra_id` vindo do trigger,
+evidência `origem=IA` sem autor, e reentrega do SQS não duplicando.
+
+**Alinhamento de configuração conferido** nos quatro pontos da cadeia
+(firmware, inferência, backend, doc): bucket `perceptra-epis-1`, região
+`sa-east-1`, conta `609330996177`, filas `fila-epis-novas-imagens` /
+`fila-resultados-web`, prefixos `raw/` e `processed/` — todos batem. O
+`CLASSE_PARA_CODIGO` do backend casa exatamente com as classes do
+`epi_model` (`Sem Capacete`, `Sem Máscara`, `Sem Colete`) e do
+`fissura_model` (`Fissura`). A divergência que eu tinha anotado antes era
+com o *seed de demo* (`SEM_CINTO`, `SEM_LUVA`), não com o pipeline real.
+
+> ### O limiar do catálogo não chega ao modelo
+>
+> `modelo_ia.limiar_confianca` **não tem efeito nenhum** no pipeline AWS.
+> Quem filtra por confiança é o `inference_service`, com limiares fixos no
+> próprio `config.py` (`EPI_CONF_THRESHOLD = 0.25`,
+> `FISSURA_CONF_THRESHOLD = 0.40`) — o Python nunca consulta o backend
+> (nenhuma chamada HTTP no repositório inteiro). E o
+> `PersistenciaDeteccaoService` também não aplica o limiar ao gravar.
+>
+> Resultado prático: `PATCH /modelos-ia/:id` muda o número no banco e não
+> muda o comportamento de nada. O seed tem `epi-detector` em 0.800 enquanto
+> o Python roda a 0.25.
+>
+> Pior: os **dois caminhos de ingestão discordam**. `POST /dispositivo/deteccoes`
+> (`DispositivoService`) RESPEITA o limiar e descarta abaixo dele; o caminho
+> AWS ignora. A mesma coluna, duas semânticas.
+>
+> Travado em teste (`limiar de confiança — divergência entre catálogo e
+> pipeline`): uma detecção a 0.30 é gravada mesmo com o catálogo em 0.800.
+>
+> Para fechar de verdade, escolha um dono do limiar: ou o
+> `inference_service` lê `GET /modelos-ia` no boot, ou o backend passa a
+> filtrar na persistência. Hoje o campo é decorativo neste caminho.

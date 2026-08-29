@@ -173,9 +173,28 @@ export class PersistenciaDeteccaoService {
     return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
   }
 
+  /**
+   * O cliente é criado com as MESMAS credenciais do `SqsConsumidorService`
+   * (`MONITORAMENTO_AWS_*`), e não pela cadeia de provedores padrão do SDK.
+   *
+   * Passar credencial explícita aqui não é preciosismo: dentro do container
+   * não existe `~/.aws`, nem role de instância, nem `AWS_*` no ambiente — a
+   * cadeia padrão não encontra nada e o download falha com
+   * `Could not load credentials from any providers`. Como a persistência é
+   * best-effort (ver `persistirComTolerancia`), o erro virava só um WARN: o
+   * feed ao vivo seguia funcionando e NENHUMA detecção do pipeline AWS
+   * chegava na Central de Alertas, sem nada gritar. Foi assim que apareceu,
+   * num teste de ponta a ponta contra a AWS real.
+   */
   private async baixarImagem(bucket: string, chave: string): Promise<Buffer> {
     if (!this.s3) {
-      this.s3 = new S3Client({ region: this.config.get<string>('monitoramento.regiao') ?? 'sa-east-1' });
+      const accessKeyId = this.config.get<string>('monitoramento.accessKeyId');
+      const secretAccessKey = this.config.get<string>('monitoramento.secretAccessKey');
+
+      this.s3 = new S3Client({
+        region: this.config.get<string>('monitoramento.regiao') ?? 'sa-east-1',
+        ...(accessKeyId && secretAccessKey ? { credentials: { accessKeyId, secretAccessKey } } : {}),
+      });
       this.bucket = bucket;
     }
     const objeto = await this.s3.send(new GetObjectCommand({ Bucket: bucket, Key: chave }));
