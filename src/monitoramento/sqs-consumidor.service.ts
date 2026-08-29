@@ -5,6 +5,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { DeleteMessageCommand, type Message, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 
 import { EventosMonitoramentoService } from './eventos-monitoramento.service.js';
+import { PersistenciaDeteccaoService } from './persistencia-deteccao.service.js';
 import type { DeteccaoBrutaJson, ResultadoMonitoramento } from './dto/resultado-monitoramento.js';
 
 interface EventoS3 {
@@ -16,6 +17,20 @@ interface ResultadoJson {
   deteccoes_epi?: DeteccaoBrutaJson[];
   deteccoes_fissura?: DeteccaoBrutaJson[];
   alertas?: { tipo: string; mensagem: string }[];
+}
+
+/**
+ * Distingue "o objeto sumiu" (nunca vai funcionar, descarta a mensagem) de
+ * "deu ruim agora" (rede, throttling, S3 instável — vale tentar de novo).
+ *
+ * O SDK v3 sinaliza isso de duas formas conforme a operação: `NoSuchKey` no
+ * `GetObject` de uma chave inexistente, e `NotFound`/404 quando o objeto foi
+ * apagado. Checar as duas evita depender de qual delas a AWS devolve.
+ */
+export function ehFalhaPermanente(erro: unknown): boolean {
+  if (typeof erro !== 'object' || erro === null) return false;
+  const alvo = erro as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return alvo.name === 'NoSuchKey' || alvo.name === 'NotFound' || alvo.$metadata?.httpStatusCode === 404;
 }
 
 /**
@@ -43,6 +58,7 @@ export class SqsConsumidorService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly eventos: EventosMonitoramentoService,
+    private readonly persistencia: PersistenciaDeteccaoService,
   ) {}
 
   onModuleInit(): void {
@@ -105,9 +121,14 @@ export class SqsConsumidorService implements OnModuleInit, OnModuleDestroy {
    * Apaga a mensagem SÓ em caso de sucesso. Em erro, deixa na fila para o
    * SQS reentregar sozinho depois do visibility timeout — pedido explícito
    * de quem desenhou o pipeline (ver prompt_para_backend_web.md): falha
-   * transitória (rede, S3 instável) se resolve na próxima tentativa; uma
-   * mensagem permanentemente inválida é problema de DLQ na fila, não algo
-   * que este consumidor deva decidir apagando por conta própria.
+   * transitória (rede, S3 instável) se resolve na próxima tentativa.
+   *
+   * A exceção é o objeto não existir mais no S3 (`NoSuchKey`/404): isso nunca
+   * se resolve tentando de novo, e a fila NÃO tem DLQ configurada (redrive
+   * desabilitado, ver ARQUITETURA_AWS.md) — sem tratar aqui, a mensagem
+   * ficaria em retry infinito. Acontece de verdade quando alguém apaga um
+   * `processed/*.json` cuja notificação ainda estava na fila (foi o caso dos
+   * objetos de teste do pipeline).
    */
   private async processarMensagem(mensagem: Message): Promise<void> {
     const { Body: corpo, ReceiptHandle: receiptHandle } = mensagem;
@@ -117,12 +138,44 @@ export class SqsConsumidorService implements OnModuleInit, OnModuleDestroy {
       const evento = this.extrairEventoS3(corpo);
       if (evento) {
         const resultado = await this.buscarResultado(evento.bucket, evento.chave);
-        if (resultado) this.eventos.emitir(resultado);
+        if (resultado) {
+          this.eventos.emitir(resultado);
+          await this.persistirComTolerancia(resultado, evento);
+        }
       }
       await this.sqs!.send(new DeleteMessageCommand({ QueueUrl: this.filaUrl, ReceiptHandle: receiptHandle }));
     } catch (erro) {
+      if (ehFalhaPermanente(erro)) {
+        this.logger.warn(
+          `Resultado nao existe mais no S3 (${erro instanceof Error ? erro.name : 'desconhecido'}) — descartando a mensagem em vez de reprocessar para sempre.`,
+        );
+        await this.sqs!.send(new DeleteMessageCommand({ QueueUrl: this.filaUrl, ReceiptHandle: receiptHandle }));
+        return;
+      }
       this.logger.warn(
         `Mensagem de resultado mantida na fila para nova tentativa: ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+    }
+  }
+
+  /**
+   * Persistência na Central de Alertas é best-effort: o feed ao vivo (SSE, já
+   * emitido acima) e o e-mail (SNS, disparado pelo serviço de inferência,
+   * fora deste backend) já aconteceram por outros caminhos. Uma falha aqui
+   * (ex.: Postgres momentaneamente fora) não deve fazer a mensagem inteira
+   * voltar pra fila — só perde esse registro na tela de triagem, e o próximo
+   * resultado processa normal.
+   */
+  private async persistirComTolerancia(
+    resultado: ResultadoMonitoramento,
+    evento: { bucket: string; chave: string },
+  ): Promise<void> {
+    try {
+      const chaveImagem = evento.chave.replace(/\.json$/, '.jpg');
+      await this.persistencia.persistir(resultado, evento.bucket, chaveImagem);
+    } catch (erro) {
+      this.logger.warn(
+        `Falha ao persistir na Central de Alertas (feed ao vivo não foi afetado): ${erro instanceof Error ? erro.message : String(erro)}`,
       );
     }
   }
