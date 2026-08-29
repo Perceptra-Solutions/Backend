@@ -79,6 +79,14 @@ export class PersistenciaDeteccaoService {
   ) {}
 
   async persistir(resultado: ResultadoMonitoramento, bucket: string, chaveImagem: string): Promise<void> {
+    // Heartbeat ANTES de qualquer filtro: todo frame processado prova que a
+    // câmera está viva, com ou sem alerta. Sem isso o
+    // CameraHeartbeatScheduler marcava a câmera como OFFLINE depois de
+    // CAMERA_HEARTBEAT_TIMEOUT_SEGUNDOS mesmo com ela mandando frame a cada
+    // segundo — foi o que aconteceu (mural mostrando OFFLINE ao vivo).
+    await this.garantirCadastros();
+    await this.cameras.update({ id: this.cameraId! }, { ultimoHeartbeat: new Date(), status: StatusCamera.ATIVA });
+
     if (resultado.alertas.length === 0) return;
 
     const candidatas = this.extrairCandidatas(resultado);
@@ -89,8 +97,6 @@ export class PersistenciaDeteccaoService {
       this.logger.debug(`Alerta sem classe mapeável para persistir: ${resultado.imagemOriginal}`);
       return;
     }
-
-    await this.garantirCadastros();
 
     const pastaTmp = await mkdtemp(join(tmpdir(), 'perceptra-monitoramento-'));
     try {

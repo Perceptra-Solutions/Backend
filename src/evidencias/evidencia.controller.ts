@@ -58,6 +58,12 @@ export class EvidenciaController {
       'Content-Type': mime,
       'Content-Disposition': `inline; filename="${nome}"`,
     });
+
+    // Sem este handler, um erro no meio da leitura (arquivo removido depois
+    // da checagem de existencia, disco com problema) emite 'error' sem
+    // ouvinte e o Node derruba o PROCESSO INTEIRO, nao so esta requisicao.
+    // Aqui os headers ja podem ter ido embora, entao so da para abortar.
+    stream.on('error', () => res.destroy());
     stream.pipe(res);
   }
 

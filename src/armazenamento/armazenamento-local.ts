@@ -1,11 +1,12 @@
 import { createReadStream } from 'node:fs';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { access, copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Readable } from 'node:stream';
 
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { RecursoNaoEncontradoError } from '../shared/erros/recurso-nao-encontrado.error.js';
 import { ArmazenamentoPort } from './armazenamento.port.js';
 
 /**
@@ -28,8 +29,26 @@ export class ArmazenamentoLocal extends ArmazenamentoPort {
     await copyFile(caminhoOrigem, destino);
   }
 
+  /**
+   * Confere a existencia ANTES de abrir o stream. `createReadStream` falha de
+   * forma assincrona, emitindo 'error' — e um ReadStream sem handler de
+   * 'error' derruba o processo Node inteiro (unhandled 'error' event), nao so
+   * a requisicao. Isso acontecia de verdade: o seed cadastra linhas de
+   * evidencia com hash sintetico e sem binario no disco, entao bastava a UI
+   * pedir o arquivo de uma delas para a API morrer.
+   *
+   * Falhando aqui, o erro vira 404 pelo filtro global, como qualquer outro
+   * recurso ausente. O handler de 'error' no controller cobre o resto (o
+   * arquivo pode sumir entre esta checagem e a leitura).
+   */
   async abrirLeitura(chave: string): Promise<Readable> {
-    return createReadStream(join(this.raiz, chave));
+    const caminho = join(this.raiz, chave);
+    try {
+      await access(caminho);
+    } catch {
+      throw new RecursoNaoEncontradoError('Arquivo de evidencia', chave);
+    }
+    return createReadStream(caminho);
   }
 
   /** Nao ha URL assinada em disco local — quem quiser o arquivo usa /evidencias/:id/integridade ou acesso direto ao volume. */
