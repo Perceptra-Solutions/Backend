@@ -585,4 +585,127 @@ describe('Invariantes do schema', () => {
       expect(await codigoDoErro(`DELETE FROM nao_conformidade WHERE id=$1`, [nc.id])).toBe('23001');
     });
   });
+
+  /**
+   * O relatorio e o artefato que sai do sistema e vai para a auditoria: ele
+   * precisa ser autoconsistente sozinho, sem depender de quem o gerou ter
+   * chamado a rota certa. Estas regras sao a rede de seguranca do
+   * RelatorioService.
+   */
+  describe('relatorio', () => {
+    async function relatorio(campos = '', valores: unknown[] = []) {
+      return um<{ id: string }>(
+        `INSERT INTO relatorio (obra_id,gerado_por,tipo,titulo${campos ? ',' + campos : ''})
+         VALUES ($1,$2,'OBRA','Relatorio de teste'${valores.map((_, i) => `,$${i + 3}`).join('')})
+         RETURNING id`,
+        [obra, engenheiroA, ...valores],
+      );
+    }
+
+    it('exige periodo completo quando o tipo e PERIODICO', async () => {
+      expect(
+        await codigoDoErro(
+          `INSERT INTO relatorio (obra_id,gerado_por,tipo,titulo)
+           VALUES ($1,$2,'PERIODICO','Sem periodo')`,
+          [obra, engenheiroA],
+        ),
+      ).toBe('23514');
+    });
+
+    it('recusa periodo pela metade — ou os dois lados, ou nenhum', async () => {
+      expect(await codigoDoErro(
+        `INSERT INTO relatorio (obra_id,gerado_por,tipo,titulo,periodo_inicio)
+         VALUES ($1,$2,'OBRA','So inicio','2026-08-01')`,
+        [obra, engenheiroA],
+      )).toBe('23514');
+    });
+
+    it('recusa periodo invertido', async () => {
+      expect(await codigoDoErro(
+        `INSERT INTO relatorio (obra_id,gerado_por,tipo,titulo,periodo_inicio,periodo_fim)
+         VALUES ($1,$2,'PERIODICO','Invertido','2026-08-31','2026-08-01')`,
+        [obra, engenheiroA],
+      )).toBe('23514');
+    });
+
+    it('recusa hash fora do formato sha-256', async () => {
+      expect(await codigoDoErro(
+        `INSERT INTO relatorio (obra_id,gerado_por,tipo,titulo,hash_sha256)
+         VALUES ($1,$2,'OBRA','Hash torto',$3)`,
+        [obra, engenheiroA, `Z${'a'.repeat(63)}`],
+      )).toBe('23514');
+    });
+
+    it('aceita hash nulo — o relatorio existe antes do arquivo ser gravado', async () => {
+      const { id } = await relatorio();
+      expect(id).toBeTruthy();
+    });
+
+    it('recusa ordem zero ou negativa no item', async () => {
+      const rel = await relatorio();
+      const nc = await ncDeDeteccao();
+      expect(
+        await codigoDoErro(
+          `INSERT INTO relatorio_item (relatorio_id,nao_conformidade_id,ordem) VALUES ($1,$2,0)`,
+          [rel.id, nc.id],
+        ),
+      ).toBe('23514');
+    });
+
+    // A mesma NC nao pode ocupar duas posicoes do mesmo relatorio, nem duas
+    // NCs a mesma posicao: sem isso a ordem persistida deixa de reproduzir
+    // a ordem impressa no documento hasheado.
+    it('impede duas NCs na mesma posicao do mesmo relatorio', async () => {
+      const rel = await relatorio();
+      const primeira = await ncDeDeteccao('ALTA');
+      const segunda = await ncDeDeteccao('MEDIA');
+
+      await db.query(
+        `INSERT INTO relatorio_item (relatorio_id,nao_conformidade_id,ordem) VALUES ($1,$2,1)`,
+        [rel.id, primeira.id],
+      );
+      expect(
+        await codigoDoErro(
+          `INSERT INTO relatorio_item (relatorio_id,nao_conformidade_id,ordem) VALUES ($1,$2,1)`,
+          [rel.id, segunda.id],
+        ),
+      ).toBe('23505');
+    });
+
+    it('apagar o relatorio leva os itens junto (CASCADE), mas nao toca nas NCs', async () => {
+      const rel = await relatorio();
+      const nc = await ncDeDeteccao();
+      await db.query(
+        `INSERT INTO relatorio_item (relatorio_id,nao_conformidade_id,ordem) VALUES ($1,$2,1)`,
+        [rel.id, nc.id],
+      );
+
+      await db.query(`DELETE FROM relatorio WHERE id=$1`, [rel.id]);
+
+      const { count } = await um<{ count: number }>(
+        `SELECT count(*)::int AS count FROM relatorio_item WHERE relatorio_id=$1`,
+        [rel.id],
+      );
+      expect(Number(count)).toBe(0);
+
+      const aindaExiste = await um<{ count: number }>(
+        `SELECT count(*)::int AS count FROM nao_conformidade WHERE id=$1`,
+        [nc.id],
+      );
+      expect(Number(aindaExiste.count)).toBe(1);
+    });
+
+    // O relatorio e prova: apagar a NC citada por um relatorio emitido
+    // deixaria o documento apontando para o vazio.
+    it('impede apagar NC citada por um relatorio (FK RESTRICT)', async () => {
+      const rel = await relatorio();
+      const nc = await ncDeDeteccao();
+      await db.query(
+        `INSERT INTO relatorio_item (relatorio_id,nao_conformidade_id,ordem) VALUES ($1,$2,1)`,
+        [rel.id, nc.id],
+      );
+
+      expect(await codigoDoErro(`DELETE FROM nao_conformidade WHERE id=$1`, [nc.id])).toBe('23001');
+    });
+  });
 });

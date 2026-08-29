@@ -105,7 +105,15 @@ export class DispositivoService {
         .orIgnore()
         .execute();
 
-      aceitas = inseridas.identifiers.length;
+      // `raw`, nao `identifiers`: com orIgnore() o TypeORM monta `identifiers`
+      // a partir do array de ENTRADA (uma entrada por candidata, sempre), e nao
+      // do que o RETURNING devolveu — entao `identifiers.length` e apenas
+      // `candidatas.length` disfarcado, e `duplicadas` dava 0 mesmo quando o
+      // ON CONFLICT descartou tudo. `raw` traz so as linhas realmente
+      // inseridas. Verificado contra Postgres real: 2a ingestao do mesmo
+      // idExterno devolve identifiers.length=1 e raw.length=0, com 1 linha
+      // no banco.
+      aceitas = inseridas.raw.length;
     }
 
     return {

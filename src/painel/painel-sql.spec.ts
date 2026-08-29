@@ -51,6 +51,25 @@ describe('SQL usado por PainelService (contra o schema real)', () => {
     ).id;
   });
 
+  /**
+   * `aberta_em` cai UMA HORA no passado por padrao, e nao em `now()`.
+   *
+   * Nao e detalhe estetico: varios casos abaixo chamam
+   * `inserirNc({ status: 'RESOLVIDA', fechadaEm: new Date().toISOString() })`.
+   * Esse `new Date()` do argumento e avaliado ANTES de entrar na funcao; o
+   * `new Date()` do default de `abertaEm` e avaliado DEPOIS. Na maioria das
+   * execucoes os dois caem no mesmo milissegundo e o CHECK
+   * `ck_nc_fechada_apos_abertura` (fechada_em >= aberta_em) passa por empate
+   * — mas basta a maquina engasgar entre as duas linhas para `aberta_em`
+   * ficar DEPOIS de `fechada_em` e o INSERT explodir. Deu falha intermitente
+   * de verdade rodando a suite sob carga; em CI lento seria pior.
+   *
+   * Uma hora tambem e coerente com o dominio (NC abre, depois fecha) e nao
+   * atrapalha os prazos: CRITICA tem SLA de 24h, entao "aberta ha 1h"
+   * continua dentro do prazo.
+   */
+  const UMA_HORA_ATRAS = () => new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
   async function inserirNc(opts: {
     obraId?: string;
     severidade?: string;
@@ -69,7 +88,7 @@ describe('SQL usado por PainelService (contra o schema real)', () => {
         opts.obraId ?? obra,
         opts.severidade ?? 'MEDIA',
         opts.status ?? 'ABERTA',
-        opts.abertaEm ?? new Date().toISOString(),
+        opts.abertaEm ?? UMA_HORA_ATRAS(),
         opts.fechadaEm ?? null,
         opts.requisitoNormaId ?? null,
         opts.reincidenciaDeId ?? null,
