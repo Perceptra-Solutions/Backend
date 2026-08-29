@@ -25,6 +25,7 @@ import { NormasModule } from './normas/normas.module.js';
 import { ObrasModule } from './obras/obras.module.js';
 import { PainelModule } from './painel/painel.module.js';
 import { QualidadeModule } from './qualidade/qualidade.module.js';
+import { RelatoriosModule } from './relatorios/relatorios.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ExcecaoGlobalFilter } from './shared/filtros/excecao-global.filter.js';
 import { LoggingInterceptor } from './shared/interceptors/logging.interceptor.js';
@@ -58,6 +59,7 @@ import { criarValidationPipe } from './shared/pipes/validacao.pipe.js';
     DispositivoModule,
     EvidenciaModule,
     PainelModule,
+    RelatoriosModule,
     HealthModule,
   ],
   providers: [

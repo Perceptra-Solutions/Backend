@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, Uploaded
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { enviarStream } from '../shared/util/enviar-stream.js';
 
 import { UsuarioAtual } from '../auth/decorators/usuario-atual.decorator.js';
 import type { UsuarioAutenticado } from '../auth/tipos/usuario-autenticado.js';
@@ -54,6 +55,7 @@ export class EvidenciaController {
   })
   async arquivo(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
     const { stream, mime, nome } = await this.evidencias.abrirArquivo(id);
+<<<<<<< HEAD
     res.set({
       'Content-Type': mime,
       'Content-Disposition': `inline; filename="${nome}"`,
@@ -65,6 +67,9 @@ export class EvidenciaController {
     // Aqui os headers ja podem ter ido embora, entao so da para abortar.
     stream.on('error', () => res.destroy());
     stream.pipe(res);
+=======
+    enviarStream(res, stream, { mime, nome });
+>>>>>>> 9834c513aac846ae96f10de23fed41ddcb87d5fd
   }
 
   @Get(':id/integridade')

@@ -64,13 +64,13 @@ npm run start:dev
 npm test
 ```
 
-53 testes, **sem precisar de banco nenhum**: as invariantes do schema rodam contra as migrations reais num PostgreSQL 18 em processo (PGlite). Funciona em qualquer máquina e no CI.
+149 testes, **sem precisar de banco nenhum**: as invariantes do schema rodam contra as migrations reais num PostgreSQL 18 em processo (PGlite). Funciona em qualquer máquina e no CI.
 
 ```bash
 npm run test:e2e
 ```
 
-Sobe a aplicação inteira contra o Postgres do container. Usa o banco `qualidade_obra_test`, nunca o de desenvolvimento — a suíte trunca tabelas. Crie-o uma vez:
+132 testes que sobem a aplicação inteira contra o Postgres do container: ciclo da qualidade, ingestão de dispositivo, relatórios, painel e cadastros. Usa o banco `qualidade_obra_test`, nunca o de desenvolvimento — a suíte trunca tabelas. Crie-o uma vez:
 
 ```bash
 docker compose exec postgres psql -U perceptra -d postgres -c "CREATE DATABASE qualidade_obra_test OWNER perceptra;"

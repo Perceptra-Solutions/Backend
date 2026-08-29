@@ -100,6 +100,18 @@ services:
       EVIDENCIA_TMP_PATH: /app/storage/tmp
       EVIDENCIA_MAX_BYTES: ${EVIDENCIA_MAX_BYTES:-209715200}
       EVIDENCIA_MIME_PERMITIDOS: ${EVIDENCIA_MIME_PERMITIDOS:-image/jpeg,image/png,image/webp,video/mp4,application/pdf}
+      # --- Monitoramento AWS (pipeline EPI/fissura) --------------------
+      # Sem estas, o SqsConsumidorService loga um aviso e nao inicia: a API
+      # sobe normal e o feed ao vivo fica desligado. Estavam faltando aqui,
+      # entao o container NUNCA recebia a credencial mesmo com o .env
+      # preenchido — o consumidor ficava desligado sem explicacao.
+      MONITORAMENTO_AWS_REGION: ${MONITORAMENTO_AWS_REGION:-sa-east-1}
+      MONITORAMENTO_AWS_BUCKET: ${MONITORAMENTO_AWS_BUCKET:-}
+      MONITORAMENTO_AWS_QUEUE_URL: ${MONITORAMENTO_AWS_QUEUE_URL:-}
+      MONITORAMENTO_AWS_ACCESS_KEY_ID: ${MONITORAMENTO_AWS_ACCESS_KEY_ID:-}
+      MONITORAMENTO_AWS_SECRET_ACCESS_KEY: ${MONITORAMENTO_AWS_SECRET_ACCESS_KEY:-}
+      MONITORAMENTO_URL_TTL_SEGUNDOS: ${MONITORAMENTO_URL_TTL_SEGUNDOS:-300}
+
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_BUCKET: ${S3_BUCKET:-}
       S3_REGION: ${S3_REGION:-auto}
